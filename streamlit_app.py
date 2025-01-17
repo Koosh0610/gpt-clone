@@ -160,7 +160,7 @@ if prompt := st.chat_input("Your question"):
             try:
                 st.write(st.session_state.user_info)
                 response = requests.post(
-                    "http://localhost:8000/chat",
+                    "http://localhost:10000/chat",
                     json={
                         "prompt": prompt,
                         "message_history": [
