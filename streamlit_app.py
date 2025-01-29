@@ -3,6 +3,7 @@ import requests
 import logging
 import json
 import os
+import re
 from typing import Dict, List, Any
 
 from dotenv import load_dotenv
@@ -18,8 +19,30 @@ logger = logging.getLogger(__name__)
 CHAT_SESSIONS_FILE = "chat_sessions.json"
 USER_INFO_FILE = "user_info.json"
 DEFAULT_LLM_MODEL = "deepseek-r1-distill-llama-70b"
-DEFAULT_INFO_EXTRACTION_MODEL = "llama-3.3-70b-versatile"
+DEFAULT_INFO_EXTRACTION_MODEL = "deepseek-r1-distill-llama-70b"
 
+agent_prompt = """You are a helpful AI assistant. Please help answer the following question.
+
+Input Question: {input_text}
+
+Previous Chat Context:
+{message_history}
+
+Relevant User Information:
+{user_info}
+
+First think through the problem step by step, then provide your response.
+Format your thinking process between <think></think> tags.
+
+<think>
+1. Understand the question
+2. Consider chat context
+3. Analyze user information
+4. Form response strategy
+</think>
+
+Your response:
+"""
 class ChatSessionManager:
     @staticmethod
     def save_sessions(chat_sessions: Dict[str, List[ChatMessage]], chat_summaries: Dict[str, str]):
@@ -83,61 +106,59 @@ class InfoExtractor:
     def extract_user_info(llm: Groq, existing_info: Dict[str, Any], message: str) -> Dict[str, Any]:
         """Extract and update user information using LLM."""
         prompt = f"""
-    <task>
-        Analyze the message for meaningful personal information about the user. 
-        If new information is found, add it to the existing memories.
-    </task>
-    <focus>
-        <category name="Core Personal Details">
-            <details>
-                - Basic: name, age, location, occupation
-                - Background: education, skills, expertise
-                - Family: marital status, children, living situation
-                - Professional: work experience, career goals
-            </details>
-        </category>
-        <category name="Individual Characteristics">
-            <details>
-                - Preferences: likes, dislikes, interests
-                - Values and beliefs
-                - Communication style
-                - Decision-making patterns
-            </details>
-        </category>
-        <category name="Current Context">
-            <details>
-                - Ongoing situations or challenges
-                - Short and long-term goals
-                - Recent significant events
-                - Primary concerns or needs
-            </details>
-        </category>
-        <category name="Relationship Dynamics">
-            <details>
-                - Important relationships mentioned
-                - Social connections
-                - Support systems
-                - Interaction patterns
-            </details>
-        </category>
-    </focus>
-    <instructions>
-        <format>
-            - Maintain a clean bulleted list structure
-            - Use concise, clear language
-            - Organize by categories when possible
-            - Include timestamp for new additions
-            - Flag uncertain or inferred information
-        </format>
-        <strict_guidelines>
-            - Return only the updated memory list
-            - Use bullet points exclusively
-            - No explanatory text or JSON
-            - No meta-commentary
-            - Preserve all verified existing memories
-        </strict_guidelines>
-    </instructions>
-    <input>
+**Memory Update Task**  
+Extract and organize personal information from the new message. Preserve verified existing memories. Only return bullet points.
+
+**Focus Categories**  
+1. **Core Details**  
+   - Name, Age, Location, Occupation  
+   - Education, Skills, Expertise  
+   - Family status, Children, Living situation  
+   - Work experience, Career goals  
+
+2. **Personal Traits**  
+   - Likes/Dislikes, Interests/Hobbies  
+   - Core values, Belief systems  
+   - Communication patterns, Decision-making style  
+
+3. **Current Situation**  
+   - Active challenges/Projects  
+   - Immediate/Long-term objectives  
+   - Recent life events  
+   - Pressing concerns/Needs  
+
+4. **Relationships**  
+   - Key personal/professional connections  
+   - Social network composition  
+   - Support systems availability  
+   - Interaction frequency/Patterns  
+
+**Processing Rules**  
+✓ Compare new message with existing memories  
+✓ Add new info as: [Timestamp] [Category] • Fact (confidence?)  
+✓ Mark uncertain items with (?)  
+✓ Preserve all verified existing entries  
+✗ No explanations/narratives  
+✗ No JSON/Markdown  
+✗ No duplicate entries  
+
+**Input Example**  
+[Existing Memories]  
+• [2024-02-15] [Core] • Software engineer (Seattle)  
+• [2024-03-01] [Traits] • Prefers text communication  
+
+[New Message]  
+"Just moved to Portland for a product manager role. Considering MBA programs but worried about costs."  
+
+**Required Output**  
+• [2024-05-20] [Core] • Product manager (Portland)  
+• [2024-05-20] [Situation] • Considering MBA programs (?)  
+• [2024-05-20] [Situation] • Financial concerns about education  
+• [2024-02-15] [Core] • Software engineer (Seattle)  
+• [2024-03-01] [Traits] • Prefers text communication
+ **Example End**  
+
+Your turn:
         <existing_memories>{existing_info}</existing_memories>
         <new_message>{message}</new_message>
     </input>
@@ -216,6 +237,20 @@ def render_sidebar():
                 st.session_state.chat_summaries
             )
             
+            
+def get_standalone_question(llm, chat_history,prompt):
+    prompt = f"""
+        Given the following conversation between a user and an AI assistant and a follow up question from user,
+        rephrase the follow up question to be a standalone question.
+
+        Chat History:""" + "\n".join([f'{{"role": "{msg.role.value}", "content": "{msg.content}"}}' for msg in chat_history[:-1]]) + f"""Follow Up Input: {prompt}"""+f"""                                            
+        Standalone question:"""
+    return llm.complete(prompt).text.strip()
+
+def get_important_info(llm, standalone_question, user_info):
+    prompt = f"Extract the relevant information from the following corpus for this message: {standalone_question}\nCorpus:\n{user_info}"
+    return llm.complete(prompt).text.strip()
+
 def main():
     # Load environment variables
     load_dotenv()
@@ -258,45 +293,42 @@ def main():
         st.session_state.user_info.update(extracted_info)
         UserInfoManager.save_info(st.session_state.user_info)
 
-        stand_alone_question = llm.complete(f"""
-                                            Given the following conversation between a user and an AI assistant and a follow up question from user,
-                                           rephrase the follow up question to be a standalone question.
-
-                                            Chat History:"""+"\n".join([f'{{"role": "{msg.role.value}", "content": "{msg.content}"}}' for msg in chat_history[:-1]])+
-                                           f"""                                            
-                                              Standalone question:""").text.strip()
-        important_info = llm.complete(f"Extract the relevant information from the following corpus for this message: {stand_alone_question}"+"\n"+"Corpus:"+"\n"+f"{st.session_state.user_info}").text.strip()
-        
-        
         # Display user message
         with st.chat_message("user"):
             st.write(prompt)
-
+            
+        # Generate standalone question and extract important information            
+        stand_alone_question = get_standalone_question(llm, chat_history,prompt)
+        important_info = get_important_info(llm, stand_alone_question, st.session_state.user_info)
+        
         # Generate assistant response
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 try:
                     # Prepare request payload
-                    response = requests.post(
-                        "http://localhost:8000/chat",
-                        json={
-                            "prompt": stand_alone_question,
-                            "message_history": [
-                                {"role": msg.role.value, "content": msg.content}
-                                for msg in chat_history[:-1]
-                            ],
-                            "user_info": important_info
-                        },
-                        timeout=30  # Add timeout to prevent hanging
-                    )
-                    response.raise_for_status()
+                    #response = requests.post(
+                        #"http://localhost:8000/chat",
+                        #json={
+                        #    "prompt": stand_alone_question,
+                        #    "message_history": [
+                        #        {"role": msg.role.value, "content": msg.content}
+                        #        for msg in chat_history[:-1]
+                        #    ],
+                        #    "user_info": important_info
+                        #},
+                        #timeout=30  # Add timeout to prevent hanging
+                    #)
+                    #response.raise_for_status()
                     # Process and display response
-                    assistant_response = response.json()["response"]
-                    st.write(assistant_response)
+                    #assistant_response = response.json()["response"]
+                    assistant_response = llm.complete(agent_prompt.format(input_text=stand_alone_question,message_history="\n".join(f"{msg.role.value.upper()}: {msg.content.strip()}" for msg in chat_history[:-1] if msg.content),user_info=important_info))
+                    with st.expander("Assistant's thought process....."):
+                        st.write(re.findall(r'<think>(.*?)</think>', assistant_response.text, re.DOTALL))
+                    st.write(assistant_response.text.split(f'</think>', 2)[-1].strip())
 
                     # Update chat history
                     chat_history.append(
-                        ChatMessage(role=MessageRole.ASSISTANT, content=assistant_response)
+                        ChatMessage(role=MessageRole.ASSISTANT, content=assistant_response.text)
                     )
 
                     # Save updated chat sessions
