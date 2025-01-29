@@ -5,10 +5,11 @@ import json
 import os
 import re
 from typing import Dict, List, Any
+
 from dotenv import load_dotenv
 from llama_index.core.base.llms.types import ChatMessage, MessageRole
 from llama_index.llms.groq import Groq
-import asyncio
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -42,7 +43,6 @@ Format your thinking process between <think></think> tags.
 
 Your response:
 """
-
 class ChatSessionManager:
     @staticmethod
     def save_sessions(chat_sessions: Dict[str, List[ChatMessage]], chat_summaries: Dict[str, str]):
@@ -103,7 +103,7 @@ class UserInfoManager:
 
 class InfoExtractor:
     @staticmethod
-    async def extract_user_info(llm: Groq, existing_info: Dict[str, Any], message: str) -> Dict[str, Any]:
+    def extract_user_info(llm: Groq, existing_info: Dict[str, Any], message: str) -> Dict[str, Any]:
         """Extract and update user information using LLM."""
         prompt = f"""
 **Memory Update Task**  
@@ -164,15 +164,15 @@ Your turn:
     </input>
     """
         try:
-            extracted_info = await llm.complete(prompt)
+            extracted_info = llm.complete(prompt).text.strip()
             if extracted_info:
-                return {"user_info": extracted_info.text.strip()}
+                return {"user_info": extracted_info}
             return {}
         except Exception as e:
             logger.error(f"Error extracting user info: {e}")
             return {}
 
-async def generate_chat_summary(chat_history: List[ChatMessage]) -> str:
+def generate_chat_summary(chat_history: List[ChatMessage]) -> str:
     """Generate a summary of the chat conversation."""
     try:
         llm = Groq(model=DEFAULT_LLM_MODEL, temperature=0)
@@ -185,7 +185,7 @@ async def generate_chat_summary(chat_history: List[ChatMessage]) -> str:
         Provide key points and outcomes in bullet format.
         """
         
-        return (await llm.complete(summary_prompt).text)
+        return llm.complete(summary_prompt).text
     except Exception as e:
         logger.error(f"Error generating chat summary: {e}")
         return "Unable to generate summary"
@@ -224,7 +224,7 @@ def render_sidebar():
             if st.session_state.current_session:
                 current_history = st.session_state.chat_sessions[st.session_state.current_session]
                 if len(current_history) > 1:
-                    summary = asyncio.run(generate_chat_summary(current_history))
+                    summary = generate_chat_summary(current_history)
                     st.session_state.chat_summaries[st.session_state.current_session] = summary
             
             # Create new session
@@ -236,6 +236,8 @@ def render_sidebar():
                 st.session_state.chat_sessions, 
                 st.session_state.chat_summaries
             )
+            
+            
 
 stand_alone_prompt = """
         Given the following conversation between a user and an AI assistant and a follow up question from user,
@@ -249,7 +251,8 @@ stand_alone_prompt = """
 
 important_info_prompt = "Extract the relevant information from the following corpus for this message: {stand_alone_question}\nCorpus:\n{user_info}"
 
-async def main():
+
+def main():
     # Load environment variables
     load_dotenv()
 
@@ -283,7 +286,7 @@ async def main():
 
         # Extract and store user information
         llm = Groq(model=DEFAULT_INFO_EXTRACTION_MODEL, temperature=0)
-        extracted_info = await InfoExtractor.extract_user_info(
+        extracted_info = InfoExtractor.extract_user_info(
             llm, 
             st.session_state.user_info, 
             prompt
@@ -297,14 +300,30 @@ async def main():
             
         # Generate standalone question and extract important information 
         chat_history_str = "\n".join(f"{msg.role.value.upper()}: {msg.content.strip()}" for msg in chat_history[:-1] if msg.content)           
-        stand_alone_question = (await llm.complete(stand_alone_prompt.format(chat_history_str=chat_history_str,prompt=prompt)).text.strip().split(f'</think>', 2)[-1].strip())
-        important_info = (await llm.complete(important_info_prompt.format(stand_alone_question=stand_alone_question,user_info=st.session_state.user_info)).text.strip().split(f'</think>', 2)[-1].strip())
+        stand_alone_question = llm.complete(stand_alone_prompt.format(chat_history_str=chat_history_str,prompt=prompt)).text.strip().split(f'</think>', 2)[-1].strip()
+        important_info = llm.complete(important_info_prompt.format(stand_alone_question=stand_alone_question,user_info=st.session_state.user_info)).text.strip().split(f'</think>', 2)[-1].strip()
         
         # Generate assistant response
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 try:
-                    assistant_response = await llm.complete(agent_prompt.format(input_text=stand_alone_question,message_history=chat_history_str,user_info=important_info))
+                    # Prepare request payload
+                    #response = requests.post(
+                        #"http://localhost:8000/chat",
+                        #json={
+                        #    "prompt": stand_alone_question,
+                        #    "message_history": [
+                        #        {"role": msg.role.value, "content": msg.content}
+                        #        for msg in chat_history[:-1]
+                        #    ],
+                        #    "user_info": important_info
+                        #},
+                        #timeout=30  # Add timeout to prevent hanging
+                    #)
+                    #response.raise_for_status()
+                    # Process and display response
+                    #assistant_response = response.json()["response"]
+                    assistant_response = llm.complete(agent_prompt.format(input_text=stand_alone_question,message_history=chat_history_str,user_info=important_info))
                     with st.expander("Assistant's thought process....."):
                         st.write(re.findall(r'<think>(.*?)</think>', assistant_response.text, re.DOTALL))
                     st.write(assistant_response.text.split(f'</think>', 2)[-1].strip())
@@ -328,4 +347,4 @@ async def main():
                     st.error(f"An unexpected error occurred: {e}")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
