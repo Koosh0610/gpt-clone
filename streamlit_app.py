@@ -246,7 +246,8 @@ stand_alone_prompt = """
         Chat History:
         {chat_history_str}
         Follow Up Input: 
-        {prompt}                                         
+        {prompt}
+        Instruction: YOU WILL ONLY GENERATE THE STAND ALONE QUESTION IN RESPONSE AFTER THINKING. NO MISCELLANEOUS TEXT.
         Standalone question:"""
 
 important_info_prompt = "Extract the relevant information from the following corpus for this message: {stand_alone_question}\nCorpus:\n{user_info}"
