@@ -32,7 +32,7 @@ Relevant User Information:
 {user_info}
 
 First think through the problem step by step, then provide your response.
-Format your thinking process between <think></think> tags.
+Format your thinking process between <think><think> tags.
 
 <think>
 1. Understand the question
