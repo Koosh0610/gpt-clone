@@ -322,9 +322,10 @@ def main():
                     # Process and display response
                     #assistant_response = response.json()["response"]
                     assistant_response = llm.complete(agent_prompt.format(input_text=stand_alone_question,message_history="\n".join(f"{msg.role.value.upper()}: {msg.content.strip()}" for msg in chat_history[:-1] if msg.content),user_info=important_info))
-                    with st.expander("Assistant's thought process....."):
-                        st.write(re.findall(r'<think>(.*?)</think>', assistant_response.text, re.DOTALL))
-                    st.write(assistant_response.text.split(f'</think>', 2)[-1].strip())
+                    #with st.expander("Assistant's thought process....."):
+                        #st.write(re.findall(r'<think>(.*?)</think>', assistant_response.text, re.DOTALL))
+                    #st.write(assistant_response.text.split(f'</think>', 2)[-1].strip())
+                    st.write(assistant_response.text)
 
                     # Update chat history
                     chat_history.append(
