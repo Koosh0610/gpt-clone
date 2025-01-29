@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from llama_index.core.base.llms.types import ChatMessage, MessageRole
 from llama_index.llms.groq import Groq
 
-from concurrent.futures import ThreadPoolExecutor
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ Relevant User Information:
 {user_info}
 
 First think through the problem step by step, then provide your response.
-Format your thinking process between <think><think> tags.
+Format your thinking process between <think></think> tags.
 
 <think>
 1. Understand the question
@@ -238,18 +238,19 @@ def render_sidebar():
             )
             
             
-def get_standalone_question(llm, chat_history,prompt):
-    prompt = f"""
+
+stand_alone_prompt = """
         Given the following conversation between a user and an AI assistant and a follow up question from user,
         rephrase the follow up question to be a standalone question.
 
-        Chat History:""" + "\n".join([f'{{"role": "{msg.role.value}", "content": "{msg.content}"}}' for msg in chat_history[:-1]]) + f"""Follow Up Input: {prompt}"""+f"""                                            
+        Chat History:
+        {chat_history_str}
+        Follow Up Input: 
+        {prompt}                                         
         Standalone question:"""
-    return llm.complete(prompt).text.strip()
 
-def get_important_info(llm, standalone_question, user_info):
-    prompt = f"Extract the relevant information from the following corpus for this message: {standalone_question}\nCorpus:\n{user_info}"
-    return llm.complete(prompt).text.strip()
+important_info_prompt = "Extract the relevant information from the following corpus for this message: {stand_alone_question}\nCorpus:\n{user_info}"
+
 
 def main():
     # Load environment variables
@@ -297,9 +298,10 @@ def main():
         with st.chat_message("user"):
             st.write(prompt)
             
-        # Generate standalone question and extract important information            
-        stand_alone_question = get_standalone_question(llm, chat_history,prompt)
-        important_info = get_important_info(llm, stand_alone_question, st.session_state.user_info)
+        # Generate standalone question and extract important information 
+        chat_history_str = "\n".join(f"{msg.role.value.upper()}: {msg.content.strip()}" for msg in chat_history[:-1] if msg.content)           
+        stand_alone_question = llm.complete(stand_alone_prompt.format(chat_history_str=chat_history_str,prompt=prompt)).text.strip().split(f'</think>', 2)[-1].strip()
+        important_info = llm.complete(important_info_prompt.format(stand_alone_question=stand_alone_question,user_info=st.session_state.user_info)).text.strip().split(f'</think>', 2)[-1].strip()
         
         # Generate assistant response
         with st.chat_message("assistant"):
@@ -321,11 +323,10 @@ def main():
                     #response.raise_for_status()
                     # Process and display response
                     #assistant_response = response.json()["response"]
-                    assistant_response = llm.complete(agent_prompt.format(input_text=stand_alone_question,message_history="\n".join(f"{msg.role.value.upper()}: {msg.content.strip()}" for msg in chat_history[:-1] if msg.content),user_info=important_info))
-                    #with st.expander("Assistant's thought process....."):
-                        #st.write(re.findall(r'<think>(.*?)</think>', assistant_response.text, re.DOTALL))
-                    #st.write(assistant_response.text.split(f'</think>', 2)[-1].strip())
-                    st.write(assistant_response.text)
+                    assistant_response = llm.complete(agent_prompt.format(input_text=stand_alone_question,message_history=chat_history_str,user_info=important_info))
+                    with st.expander("Assistant's thought process....."):
+                        st.write(re.findall(r'<think>(.*?)</think>', assistant_response.text, re.DOTALL))
+                    st.write(assistant_response.text.split(f'</think>', 2)[-1].strip())
 
                     # Update chat history
                     chat_history.append(
