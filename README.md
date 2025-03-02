@@ -50,5 +50,5 @@ This project is a Streamlit-based LLM app that leverages the Groq LLM to provide
 This project is licensed under the MIT License.
 
 ## Author
-Developed by [Your Name].
+Developed by [[Kush Juvekar](https://linkedin.com/in/kush-juvekar)].
 
