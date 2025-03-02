@@ -1,7 +1,7 @@
 # Prompt based Memory Management using JSON files
 
 ## Overview
-This project is a Streamlit-based LLM app that leverages the Groq LLM to provide an AI-powered chatbot. The system supports user profiling, chat history management, and context-aware responses.
+This project is an attempt to replicate to the memory feature present in the ChatGPT interface without relying on comlex retrieval techniques and frameworks. 
 
 ## Features
 - **Conversational AI**: Uses the DeepSeek-R1-Distill-LLaMA-70B model for chat responses.
