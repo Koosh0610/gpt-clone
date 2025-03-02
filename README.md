@@ -13,8 +13,8 @@ This project is a Streamlit-based LLM app that leverages the Groq LLM to provide
 - **Streamlit UI**: Interactive frontend with sidebar navigation and chat display.
 
 ## Simplicity
-- Memory layer solutions for agentic or LLM app like MemGPT, mem0, get-zep, memobase etc rely on various database and large context management systems. They most often also involve retrieval of memory using RAG.
-  However, I believe LLMs are capable of traditional tasks of information retrieval, classification, sentiment analysis to a good extent. This chatbot has been tested on the [LongMemEval]([url](https://github.com/xiaowu0162/LongMemEval)) and found to be satisfactory. I cannot provide with metrics as I ran out API credits before I could complete a statistical significant amount of test runs.
+- Memory layer solutions for agentic or LLM apps, like MemGPT, mem0, get-zep, memobase etc rely on various database and large context management systems. They most often also involve retrieval of memory using RAG.
+  However, I believe LLMs are capable of traditional tasks of information retrieval, classification, sentiment analysis etc. to a good extent. This chatbot has been tested on the [LongMemEval]([url](https://github.com/xiaowu0162/LongMemEval)) and found to be satisfactory. I cannot provide with metrics as I ran out API credits before I could complete a statistically significant amount of test runs.
 
 ## Installation
 1. Clone the repository:
