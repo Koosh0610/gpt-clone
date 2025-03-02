@@ -1,7 +1,7 @@
-# ChatGPT Clone with Streamlit
+# Prompt based Memory Management using JSON files
 
 ## Overview
-This project is a Streamlit-based ChatGPT clone that leverages the Groq LLM to provide an AI-powered chatbot. The system supports user profiling, chat history management, and context-aware responses.
+This project is a Streamlit-based LLM app that leverages the Groq LLM to provide an AI-powered chatbot. The system supports user profiling, chat history management, and context-aware responses.
 
 ## Features
 - **Conversational AI**: Uses the DeepSeek-R1-Distill-LLaMA-70B model for chat responses.
@@ -43,6 +43,7 @@ This project is a Streamlit-based ChatGPT clone that leverages the Groq LLM to p
 ## Future Enhancements
 - Improve UI/UX for better user experience.
 - Integrate multiple LLM models for task-specific optimizations.
+- Add RAG for file uploads and multimodal support.
 - Reduce latency by optimizing for sequential LLM calls.
 
 ## License
