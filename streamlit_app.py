@@ -9,7 +9,7 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 from llama_index.core.base.llms.types import ChatMessage, MessageRole
-from llama_index.llms.groq import Groq
+from llama_index.llms.openai import OpenAI
 
 
 # Configure logging
@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 CHAT_SESSIONS_FILE = "chat_sessions.json"
 USER_INFO_FILE = "user_info.json"
 USER_PROFILES_FILE = "user_profiles.json"
-DEFAULT_LLM_MODEL = "deepseek-r1-distill-llama-70b"
-DEFAULT_INFO_EXTRACTION_MODEL = "deepseek-r1-distill-llama-70b"
+DEFAULT_LLM_MODEL = "r1-1776"
+DEFAULT_INFO_EXTRACTION_MODEL = "r1-1776"
 
 agent_prompt = """You are a helpful AI assistant. Please help answer the following question.
 
@@ -162,7 +162,7 @@ class UserProfileManager:
 
 class InfoExtractor:
     @staticmethod
-    def extract_user_info(llm: Groq, existing_info: Dict[str, Any], message: str) -> Dict[str, Any]:
+    def extract_user_info(llm: OpenAI, existing_info: Dict[str, Any], message: str) -> Dict[str, Any]:
         """Extract and update user information using LLM."""
         # Make sure we have the existing user_info as a string
         existing_info_str = existing_info.get("user_info", "")
@@ -252,7 +252,7 @@ def remove_think_tags(text):
 
 class UserProfiler:
     @staticmethod
-    def create_or_update_profile(llm: Groq, user_id: str, user_info: Dict[str, Any], 
+    def create_or_update_profile(llm: OpenAI, user_id: str, user_info: Dict[str, Any], 
                                 chat_history: List[ChatMessage], existing_profile: Dict[str, Any] = None) -> Dict[str, Any]:
         """Create or update user profile based on chat history and user info."""
         
@@ -367,7 +367,7 @@ Ensure values are based on observed patterns, not assumptions. If insufficient d
 def generate_chat_summary(chat_history: List[ChatMessage]) -> str:
     """Generate a summary of the chat conversation."""
     try:
-        llm = Groq(model=DEFAULT_LLM_MODEL, temperature=0)
+        llm = OpenAI(model=DEFAULT_LLM_MODEL, temperature=0,api_base="https://api.perplexity.ai")
         
         messages_text = "\n".join([f"{msg.role}: {msg.content}" for msg in chat_history])
         summary_prompt = f"""
@@ -582,7 +582,7 @@ def main():
             chat_history.append(user_message)
 
             # Create LLM instance
-            llm = Groq(model=DEFAULT_INFO_EXTRACTION_MODEL, temperature=0)
+            llm = OpenAI(model=DEFAULT_INFO_EXTRACTION_MODEL, temperature=0,api_base="https://api.perplexity.ai")
             
             # Extract and store user information
             extracted_info = InfoExtractor.extract_user_info(
@@ -689,7 +689,7 @@ def main():
             # Debug tools (for developers)
             with st.expander("Debug Tools"):
                 if st.button("Force Profile Update"):
-                    llm = Groq(model=DEFAULT_INFO_EXTRACTION_MODEL, temperature=0)
+                    llm = OpenAI(model=DEFAULT_INFO_EXTRACTION_MODEL, temperature=0,api_base="https://api.perplexity.ai")
                     current_profile = st.session_state.user_profiles.get(st.session_state.current_user_id, None)
                     updated_profile = UserProfiler.create_or_update_profile(
                         llm,
